@@ -61,8 +61,27 @@ const TUBO = { "1.5": 120, "2": 140, "1": 90, "0.75": 60 }; // R$/m por bitola
 const TUBO_PADRAO = "1.5";
 const CURVA_180 = 180;
 
-const ESPELHO = 0.13;   // +0,13 na largura quando há espelho 7cm (padrão)
-const SEM_ESPELHO = 0;
+// ── ESPELHO / DOBRA DA CHAPA ──────────────────────────────────
+// A chapa consome a ALTURA DO ESPELHO + a DOBRA fixa de 6cm.
+// Acréscimo na largura = altura_do_espelho + 0,06
+// A dobra de 6cm existe SEMPRE, inclusive quando NÃO há espelho.
+//   sem espelho .......  0    + 0,06 = 0,06
+//   espelho 7cm  ......  0,07 + 0,06 = 0,13   (PADRÃO)
+//   espelho 10cm ......  0,10 + 0,06 = 0,16
+//   espelho 15cm ......  0,15 + 0,06 = 0,21
+// Vale para bancada, pia, balcão e tampo de mesa.
+const DOBRA           = 0.06;   // dobra da chapa — FIXA, nunca muda
+const ESPELHO_PADRAO  = 0.07;   // espelho de 7cm é o padrão
+
+/**
+ * Acréscimo na largura em função do espelho.
+ * @param espelho  undefined/true = padrão 7cm | false = sem espelho | número = altura em metros
+ */
+function acrescimoEspelho(espelho) {
+  if (espelho === false)            return DOBRA;                  // sem espelho: só a dobra
+  if (typeof espelho === 'number')  return espelho + DOBRA;        // altura informada
+  return ESPELHO_PADRAO + DOBRA;                                   // padrão 7cm
+}
 
 // ╔══════════════════════════════════════════════════════════════╗
 // ║  ARREDONDAMENTO OFICIAL (seção 4.5)                           ║
@@ -104,7 +123,7 @@ function calcBancada(p) {
   const comps = p.comps;
   const somaComp = comps.reduce((a, b) => a + b, 0);
   const larg = p.larg;
-  const esp = (p.espelho === false) ? SEM_ESPELHO : ESPELHO; // espelho 7cm é padrão
+  const esp = acrescimoEspelho(p.espelho); // altura do espelho + dobra de 6cm
   const ind = indicadorDe(p.chapa);
   const cubas = p.cubas || [];
   const valorCubas = cubas.reduce((a, c) => a + valorCuba(c), 0);
@@ -118,7 +137,13 @@ function calcBancada(p) {
     ? fmtMed(comps[0], larg)
     : comps.map(c => c.toFixed(2).replace('.', ',')).join(' + ') + ` x ${larg.toFixed(2).replace('.', ',')}m`;
   let desc = `${nome} em aço inox AISI 304/18.8, medindo ${medida}`;
-  desc += (p.espelho === false) ? '' : ', com espelho de 7cm';
+  if (p.espelho === false) {
+    // sem espelho: não escreve nada na descrição
+  } else if (typeof p.espelho === 'number') {
+    desc += `, com espelho de ${Math.round(p.espelho * 100)}cm`;
+  } else {
+    desc += ', com espelho de 7cm';
+  }
   if (cubas.length === 1) {
     desc += `, com 01 cuba de ${cubaTxt(cubas[0])}`;
   } else if (cubas.length > 1) {
@@ -245,6 +270,13 @@ if (require.main === module) {
     { nome: 'Pia 1,00x0,60 + cuba padrão (esperado 720)', peca: { tipo:'pia', comps:[1.00], larg:0.60, cubas:[CUBA_PADRAO] }, esperado: 720 },
     { nome: 'Bancada 2,00x0,50 c/ espelho chapa22 (esperado 774)', peca: { tipo:'bancada', comps:[2.00], larg:0.50 }, esperado: 774 },
     { nome: 'Bancada 1,60x0,70 + cuba padrão (esperado 1076)', peca: { tipo:'bancada', comps:[1.60], larg:0.70, cubas:[CUBA_PADRAO] }, esperado: 1076 },
+    // ── Testes do espelho (dobra 6cm) ──
+    // Bancada 2,00x0,50 SEM espelho: (2,10) x (0,50+0,06) x 6,5 x 90 = 687,96 -> 688
+    { nome: 'Bancada 2,00x0,50 SEM espelho, com dobra 6cm (esperado 688)', peca: { tipo:'bancada', comps:[2.00], larg:0.50, espelho:false }, esperado: 688 },
+    // Bancada 2,00x0,50 espelho 10cm: (2,10) x (0,50+0,16) x 6,5 x 90 = 810,81 -> 811
+    { nome: 'Bancada 2,00x0,50 espelho 10cm (esperado 811)', peca: { tipo:'bancada', comps:[2.00], larg:0.50, espelho:0.10 }, esperado: 811 },
+    // Bancada 2,00x0,50 espelho 15cm: (2,10) x (0,50+0,21) x 6,5 x 90 = 872,24 -> 873
+    { nome: 'Bancada 2,00x0,50 espelho 15cm (esperado 873)', peca: { tipo:'bancada', comps:[2.00], larg:0.50, espelho:0.15 }, esperado: 873 },
   ];
   let ok = true;
   for (const t of testes) {
