@@ -7,7 +7,10 @@
  * --------------------------------------------------------------
  *
  * TIPOS DE PEÇA aceitos no array `pecas`:
- *  bancada / pia : { tipo, comps:[c1,(c2),(c3)], larg, quant?, chapa?(22), espelho?(default true), cubas?:["40x34x15", ...] }
+ *  bancada / pia : { tipo, comps:[c1,(c2),(c3)], larg, quant?, chapa?(22), espelho?, cubas?:["40x34x15", ...] }
+ *                  espelho: omitir/true = padrão 7cm (+0,13) | false = SEM espelho (+0,06, só a dobra)
+ *                           número = altura em METROS, ex 0.10 (+0,16) / 0.15 (+0,21)
+ *                  A chapa consome sempre altura_do_espelho + 0,06 de dobra.
  *  coifa         : { tipo:'coifa', comp, larg, quant?, filtro?(default true) }
  *  duto          : { tipo:'duto', diametro(m), comp(m), quant?, chapa?(28) }
  *  exaustor      : { tipo:'exaustor', diametro_cm, quant? }   // 30,40,50
