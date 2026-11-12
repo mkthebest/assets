@@ -33,6 +33,7 @@ const CUBAS = {
   "50x40x20": 600,
   "50x40x25": 700,
   "50x40x30": 800,
+  "50x40x40": 1400,  // Maikon 08/09/2026 (obras Arapiraca e Benedito Bentes/AL) — Ordem 30
   "60x50x30": 1900,
   "45x40x30": 1380,
   "57x50x50": 2680,
@@ -156,6 +157,43 @@ function calcBancada(p) {
   return { valor, spec: [desc] };
 }
 
+// Texto das cubas no padrão de contagem: "01 cuba de 50x40x25cm", "02 cubas de ... e 01 cuba de ..."
+function cubasTxt(cubas) {
+  const cont = {};
+  cubas.forEach(c => cont[c] = (cont[c] || 0) + 1);
+  return Object.entries(cont)
+    .map(([c, n]) => `${String(n).padStart(2, '0')} cuba${n > 1 ? 's' : ''} de ${cubaTxt(c)}`)
+    .join(' e ');
+}
+
+/**
+ * MESA (Ordem 30). p = {
+ *   tipo:'mesa', comp, larg, chapa?(22), espelho?(igual bancada), cubas?:[...], prateleira?(false)
+ * }
+ * VALOR = TAMPO + SAIOTE + CUBAS + PÉS, com Math.ceil UMA vez no total (Método A, Maikon 21/07/2026).
+ *   TAMPO  = (comp + 0,10) × (larg + acréscimo do espelho) × indicador × 90   (mesma fórmula da bancada)
+ *   SAIOTE = (comp × 2 + larg × 2) × 0,15 × indicador × 90                  (0,15 = altura do saiote)
+ *   PÉS    = R$ 300 fixo por mesa
+ * Descrição fixa (Maikon 08/09/2026): cuba SEMPRE escrita; saiote, espelho e acabamento NUNCA escritos;
+ * prateleira sempre declarada (padrão = sem prateleira inferior).
+ */
+const SAIOTE_ALTURA = 0.15;
+function calcMesa(p) {
+  const comp = p.comp, larg = p.larg;
+  const ind = indicadorDe(p.chapa);
+  const cubas = p.cubas || [];
+  const tampo  = (comp + 0.10) * (larg + acrescimoEspelho(p.espelho)) * ind * KG_INOX;
+  const saiote = (comp * 2 + larg * 2) * SAIOTE_ALTURA * ind * KG_INOX;
+  const valorCubas = cubas.reduce((a, c) => a + valorCuba(c), 0);
+  const valor = arred(tampo + saiote + valorCubas + FIXOS.pes);
+
+  let desc = `Mesa em aço inox AISI 304/18.8, com estrutura em tubo de aço inox, medindo ${fmtMed(comp, larg)}`;
+  if (cubas.length) desc += `, com ${cubasTxt(cubas)}`;
+  desc += ', com pés com sapatas de nylon reguláveis';
+  desc += p.prateleira ? ', com prateleira inferior.' : ', sem prateleira inferior.';
+  return { valor, spec: [desc] };
+}
+
 function cubaTxt(c) {
   if (c.startsWith('redonda')) {
     const m = c.replace('redonda', '').split('x'); // 40x50 -> Ø40 prof.50
@@ -236,6 +274,7 @@ function calcSemPreco(p) { return { valor: null, spec: p.spec }; }
 const CALC = {
   bancada: calcBancada,
   pia: calcBancada,
+  mesa: calcMesa,
   coifa: calcCoifa,
   duto: calcDuto,
   exaustor: calcExaustor,
@@ -277,6 +316,16 @@ if (require.main === module) {
     { nome: 'Bancada 2,00x0,50 espelho 10cm (esperado 811)', peca: { tipo:'bancada', comps:[2.00], larg:0.50, espelho:0.10 }, esperado: 811 },
     // Bancada 2,00x0,50 espelho 15cm: (2,10) x (0,50+0,21) x 6,5 x 90 = 872,24 -> 873
     { nome: 'Bancada 2,00x0,50 espelho 15cm (esperado 873)', peca: { tipo:'bancada', comps:[2.00], larg:0.50, espelho:0.15 }, esperado: 873 },
+    // ── Cuba 50x40x40 = 1400 (Ordem 30) ──
+    // (1,70) x (0,70+0,13) x 6,5 x 90 + 1400 = 2225,44 -> 2226
+    { nome: 'Bancada 1,60x0,70 + cuba 50x40x40 (esperado 2226)', peca: { tipo:'bancada', comps:[1.60], larg:0.70, cubas:['50x40x40'] }, esperado: 2226 },
+    // ── Mesa = tampo + saiote + cubas + pés, ceil 1x no total (Ordem 30) ──
+    // tampo (1,60)x(0,83)x585 = 776,88 + saiote (4,40)x0,15x585 = 386,10 + pés 300 = 1462,98 -> 1463
+    { nome: 'Mesa 1,50x0,70 sem cuba (esperado 1463)', peca: { tipo:'mesa', comp:1.50, larg:0.70 }, esperado: 1463 },
+    // tampo 1019,655 + saiote 473,85 + 2 cubas 2800 + pés 300 = 4593,505 -> 4594
+    { nome: 'Mesa 2,00x0,70 + 2 cubas 50x40x40 (esperado 4594)', peca: { tipo:'mesa', comp:2.00, larg:0.70, cubas:['50x40x40','50x40x40'] }, esperado: 4594 },
+    // sem espelho: tampo (1,30)x(0,66)x585 = 501,93 + saiote 315,90 + cuba 700 + pés 300 = 1817,83 -> 1818
+    { nome: 'Mesa 1,20x0,60 sem espelho + cuba 50x40x25 (esperado 1818)', peca: { tipo:'mesa', comp:1.20, larg:0.60, espelho:false, cubas:['50x40x25'] }, esperado: 1818 },
   ];
   let ok = true;
   for (const t of testes) {
